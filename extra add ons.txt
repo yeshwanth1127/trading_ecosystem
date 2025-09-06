@@ -1,0 +1,49 @@
+🚀 Extended Prop Firm Platform: The Unique Add-Ons
+1. Trade Insurance (“Reset / Loss Protection”)
+
+Traders can buy insurance credits before starting a challenge.
+
+If they hit daily loss or account drawdown → they can reset the account or continue without failing.
+
+Different packages (basic reset, partial reset, multi-reset bundles).
+💰 Revenue Impact: Reliable microtransactions, converts fear into revenue.
+
+2. Marketplace for Strategies
+
+Traders who pass challenges or verified algo creators can list their strategies on the platform.
+
+Others can subscribe to signals/indicators from the marketplace.
+
+Platform acts as the “App Store for trading strategies.”
+
+Revenue share model (e.g., creator keeps 70%, platform 30%).
+💰 Revenue Impact: Recurring subscription income, long-term network effect.
+
+3. Trading Battles (Duels & Leagues)
+
+1v1 Duels: Two traders compete on simulated accounts for X days. Winner takes prize pool.
+
+Team Battles / Leagues: Groups compete, with leaderboards & playoffs.
+
+Entry fees → pooled into prizes, platform takes a cut (like eSports for trading).
+💰 Revenue Impact: High engagement + new income via entry fees.
+
+4. AI-Based Emotional Trading Meter 🧠
+
+Use AI to detect emotional states from trading patterns (over-trading, revenge trades, tilt).
+
+Optional: integrate biometrics (heart rate from smartwatch, typing speed, sentiment analysis from trade notes).
+
+If emotional risk is detected → platform gives alerts or even auto-lockout.
+
+Premium tier: personalized AI “coach” that helps the trader manage psychology.
+💰 Revenue Impact: Upsell premium subscriptions, unique positioning as the safe prop firm.
+
+5. Regret Tax (Undo Feature) 😂
+
+Traders can pay a small fee to undo one bad trade (cancel PnL hit, reset trade).
+
+Fee goes into a “regret pool” → part is revenue, part funds jackpots/giveaways.
+
+Creates a fun, gamified safety net.
+💰 Revenue Impact: Frequent micro-purchases from emotional traders, creates a playful revenue stream.

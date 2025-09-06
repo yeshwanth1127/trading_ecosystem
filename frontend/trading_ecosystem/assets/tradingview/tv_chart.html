@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+  />
+  <style>
+    html, body, #tv_container { 
+      height: 100%; 
+      width: 100%; 
+      margin: 0; 
+      padding: 0; 
+      background: #0e1116; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .tradingview-widget-container {
+      height: 100%;
+      width: 100%;
+    }
+    
+    #tv_container {
+      height: 100%;
+      width: 100%;
+    }
+    
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #ffffff;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="tradingview-widget-container">
+    <div id="tv_container">
+      <div class="loading">Loading TradingView Chart...</div>
+    </div>
+  </div>
+
+  <script src="https://s3.tradingview.com/tv.js"></script>
+  <script>
+    // Global variables
+    let tvWidget = null;
+    let currentSymbol = "BINANCE:BTCUSDT";
+    let currentInterval = "60";
+    let isChartReady = false;
+
+    // Initialize TradingView widget
+    function initWidget(symbol, interval) {
+      currentSymbol = symbol || currentSymbol;
+      currentInterval = interval || currentInterval;
+
+      // Remove existing widget if present
+      if (tvWidget) {
+        try { 
+          tvWidget.remove(); 
+        } catch (e) {
+          console.log("Widget removal error:", e);
+        }
+        tvWidget = null;
+      }
+
+      // Clear loading message
+      const container = document.getElementById('tv_container');
+      container.innerHTML = '';
+
+      // Create new widget
+      tvWidget = new TradingView.widget({
+        // Core settings
+        "symbol": currentSymbol,
+        "interval": currentInterval,
+        "container_id": "tv_container",
+        "library_path": "/",
+        
+        // Appearance
+        "autosize": true,
+        "theme": "dark",
+        "style": "1",
+        "timezone": "Etc/UTC",
+        "locale": "en",
+        
+        // Toolbar settings
+        "toolbar_bg": "#131722",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "hide_side_toolbar": false,
+        "withdateranges": true,
+        "hide_top_toolbar": false,
+        
+        // Features
+        "studies": [],
+        "details": true,
+        "hotlist": false,
+        "calendar": false,
+        "disabled_features": [],
+        "enabled_features": [],
+        
+        // Responsive
+        "responsive": true,
+        "main_series": "candlestick"
+      });
+
+      // Handle chart ready event - use the correct API
+      if (tvWidget && typeof tvWidget.onChartReady === 'function') {
+        tvWidget.onChartReady(() => {
+          isChartReady = true;
+          console.log("TradingView chart ready");
+        });
+      } else {
+        // Fallback for web platform
+        setTimeout(() => {
+          isChartReady = true;
+          console.log("TradingView chart ready (fallback)");
+        }, 2000);
+      }
+
+      // Handle errors if available
+      if (tvWidget && typeof tvWidget.onError === 'function') {
+        tvWidget.onError((error) => {
+          console.error("TradingView error:", error);
+        });
+      }
+    }
+
+    // Change symbol
+    function setSymbol(symbol) {
+      if (!symbol || symbol === currentSymbol) return;
+      
+      currentSymbol = symbol;
+      console.log("Setting symbol to:", symbol);
+      
+      if (tvWidget && isChartReady) {
+        try {
+          // Try to change symbol on existing chart
+          if (tvWidget.activeChart && typeof tvWidget.activeChart().setSymbol === 'function') {
+            tvWidget.activeChart().setSymbol(symbol, () => {
+              console.log("Symbol changed successfully to:", symbol);
+            });
+          } else {
+            // Fallback: reinitialize widget
+            initWidget(symbol, currentInterval);
+          }
+        } catch (e) {
+          console.log("Symbol change failed, reinitializing:", e);
+          initWidget(symbol, currentInterval);
+        }
+      } else {
+        // Widget not ready, initialize with new symbol
+        initWidget(symbol, currentInterval);
+      }
+    }
+
+    // Change interval
+    function setInterval(interval) {
+      if (!interval || interval === currentInterval) return;
+      
+      currentInterval = interval;
+      console.log("Setting interval to:", interval);
+      
+      if (tvWidget && isChartReady) {
+        try {
+          // Try to change interval on existing chart
+          if (tvWidget.activeChart && typeof tvWidget.activeChart().setResolution === 'function') {
+            tvWidget.activeChart().setResolution(interval, () => {
+              console.log("Interval changed successfully to:", interval);
+            });
+          } else if (tvWidget.chart && typeof tvWidget.chart().setResolution === 'function') {
+            tvWidget.chart().setResolution(interval, () => {
+              console.log("Interval changed successfully to:", interval);
+            });
+          } else {
+            // Fallback: reinitialize widget
+            initWidget(currentSymbol, interval);
+          }
+        } catch (e) {
+          console.log("Interval change failed, reinitializing:", e);
+          initWidget(currentSymbol, interval);
+        }
+      } else {
+        // Widget not ready, initialize with new interval
+        initWidget(currentSymbol, interval);
+      }
+    }
+
+    // Get current chart state
+    function getChartState() {
+      return {
+        symbol: currentSymbol,
+        interval: currentInterval,
+        isReady: isChartReady
+      };
+    }
+
+    // Expose API to Flutter/Web
+    window.TVDart = {
+      initWidget,
+      setSymbol,
+      setInterval,
+      getChartState
+    };
+
+    // Initialize on page load
+    document.addEventListener("DOMContentLoaded", function() {
+      console.log("TradingView chart page loaded");
+      initWidget(currentSymbol, currentInterval);
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', function() {
+      if (tvWidget && isChartReady) {
+        try {
+          if (typeof tvWidget.resize === 'function') {
+            tvWidget.resize();
+          }
+        } catch (e) {
+          console.log("Resize error:", e);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

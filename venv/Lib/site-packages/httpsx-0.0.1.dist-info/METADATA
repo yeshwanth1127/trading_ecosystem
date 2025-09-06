@@ -1,0 +1,29 @@
+Metadata-Version: 2.1
+Name: httpsx
+Version: 0.0.1
+Summary: UNKNOWN
+Home-page: https://hjfgakhdgfhjkadgfjagdkfjhahfa.com
+Author: huangzhengrui
+Author-email: 156546731@qq.com
+Maintainer: huangzhengrui
+Maintainer-email: 156546731@qq.com
+License: BSD License
+Platform: all
+Classifier: Development Status :: 4 - Beta
+Classifier: Operating System :: OS Independent
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: Implementation
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Topic :: Software Development :: Libraries
+Requires-Dist: requests
+
+UNKNOWN
+
+
