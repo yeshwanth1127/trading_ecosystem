@@ -323,6 +323,108 @@ class ApiService {
     }
   }
 
+  // Freqtrade proxy
+  Future<ApiResponse<Map<String, dynamic>>> ftStart() async {
+    try {
+      final response = await _dio.post('/ft/start');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(response.data);
+      }
+      return ApiResponse.error('Failed to start trading instance');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftStatus() async {
+    try {
+      final response = await _dio.get('/ft/status');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(response.data);
+      }
+      return ApiResponse.error('Failed to get status');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftBalance() async {
+    try {
+      final response = await _dio.get('/ft/balance');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(response.data);
+      }
+      return ApiResponse.error('Failed to get balance');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftPositions() async {
+    try {
+      final response = await _dio.get('/ft/positions');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(response.data);
+      }
+      return ApiResponse.error('Failed to get positions');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftTrades() async {
+    try {
+      final response = await _dio.get('/ft/trades');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(response.data);
+      }
+      return ApiResponse.error('Failed to get trades');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftOverview() async {
+    try {
+      final response = await _dio.get('/ft/overview');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(Map<String, dynamic>.from(response.data));
+      }
+      return ApiResponse.error('Failed to get overview');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftForcebuy(String pair, {double? amount}) async {
+    try {
+      final response = await _dio.post('/ft/forcebuy', data: {
+        'pair': pair,
+        if (amount != null) 'amount': amount,
+      });
+      if (response.statusCode == 200) {
+        return ApiResponse.success(Map<String, dynamic>.from(response.data));
+      }
+      return ApiResponse.error('Failed to place order');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftForcesell(String tradeId) async {
+    try {
+      final response = await _dio.post('/ft/forcesell', data: {
+        'tradeid': tradeId,
+      });
+      if (response.statusCode == 200) {
+        return ApiResponse.success(Map<String, dynamic>.from(response.data));
+      }
+      return ApiResponse.error('Failed to close trade');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
   Future<ApiResponse<Map<String, dynamic>>> getMarketData({String? marketType}) async {
     try {
       final Map<String, dynamic>? queryParams = marketType != null ? {'market_type': marketType} : null;

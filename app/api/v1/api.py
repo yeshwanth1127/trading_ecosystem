@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import api, auth, challenge_selection, trading
-from app.api.v1 import market_data, real_time_market_data, execution_engine, trading_events, account_balance, error_monitoring, websocket_endpoints
+from app.api.v1 import market_data, error_monitoring
+from app.api.v1.endpoints import freqtrade_proxy
 
 api_router = APIRouter()
 
@@ -16,23 +17,11 @@ api_router.include_router(challenge_selection.router, prefix="/challenge-selecti
 # Include trading platform endpoints
 api_router.include_router(trading.router, prefix="/trading", tags=["trading"])
 
+# New Freqtrade proxy endpoints
+api_router.include_router(freqtrade_proxy.router, prefix="/ft", tags=["freqtrade"])
+
 # Include market data endpoints
 api_router.include_router(market_data.router, tags=["market-data"])
 
-# Include real-time market data endpoints
-api_router.include_router(real_time_market_data.router, tags=["real-time-market-data"])
-
-# Include execution engine endpoints
-api_router.include_router(execution_engine.router, tags=["execution-engine"])
-
-# Include trading events endpoints
-api_router.include_router(trading_events.router, tags=["trading-events"])
-
-# Include account balance endpoints
-api_router.include_router(account_balance.router, prefix="/account", tags=["account-balance"])
-
 # Include error monitoring endpoints
 api_router.include_router(error_monitoring.router, tags=["error-monitoring"])
-
-# Include WebSocket endpoints
-api_router.include_router(websocket_endpoints.router, tags=["websocket"])

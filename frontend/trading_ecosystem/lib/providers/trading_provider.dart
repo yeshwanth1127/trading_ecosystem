@@ -606,6 +606,21 @@ class TradingProvider with ChangeNotifier {
       debugPrint('Background position refresh error: $e');
     }
   }
+
+  /// Refresh balance and positions via Freqtrade proxy
+  Future<void> refreshFromFreqtrade() async {
+    try {
+      final api = ApiService();
+      final status = await api.ftStatus();
+      if (!(status.isSuccess && (status.data?['running'] == true))) {
+        await api.ftStart();
+      }
+      await _loadUserBalanceBackground();
+      await _refreshPositionDataBackground();
+    } catch (e) {
+      debugPrint('refreshFromFreqtrade error: $e');
+    }
+  }
   
   /// Background load user balance (no loading state, no UI glitch, no console spam)
   Future<void> _loadUserBalanceBackground() async {
@@ -638,16 +653,8 @@ class TradingProvider with ChangeNotifier {
   
   /// Trigger backend position price updates (internal method)
   Future<void> _triggerPositionPriceUpdate() async {
-    try {
-      final apiService = ApiService();
-      final token = await apiService.getToken();
-      
-      if (token != null) {
-        await TradingService.updatePositionPrices(token);
-      }
-    } catch (e) {
-      debugPrint('Error triggering position price update: $e');
-    }
+    // Deprecated with Freqtrade orchestration - positions/prices are managed by Freqtrade
+    return;
   }
 
   void _stopRealTimeUpdates() {

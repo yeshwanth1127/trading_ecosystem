@@ -6,6 +6,9 @@ from app.crud import user
 from app.schemas import UserCreate, UserResponse, UserLogin, Token
 from app.core.security import create_access_token, verify_token
 import logging
+from app.orchestrator import orchestrator
+from app.crud import challenge_selection as challenge_selection_crud
+from app.services.trading_challenge_service import TradingChallengeService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,6 +32,10 @@ async def register(
         # Create new user
         db_user = await user.create(db, obj_in=user_in)
         logger.info(f"User registered successfully: {db_user.email}")
+
+        # Create per-user user_data directory from template
+        orchestrator.ensure_user_userdir(str(db_user.user_id))
+
         return db_user
         
     except HTTPException:
@@ -70,6 +77,14 @@ async def login(
         access_token = create_access_token(
             data={"sub": str(db_user.user_id), "email": db_user.email}
         )
+
+        # On login, start user's Freqtrade instance using active challenge amount
+        active = await challenge_selection_crud.get_active_by_user_id(db, user_id=str(db_user.user_id))
+        if active:
+            initial_balance = TradingChallengeService.parse_amount(active.amount)
+            if initial_balance <= 0:
+                initial_balance = 1000.0
+            orchestrator.start_instance(str(db_user.user_id), dry_run_wallet=initial_balance)
         
         logger.info(f"User logged in successfully: {db_user.email}")
         return {
@@ -90,6 +105,25 @@ async def login(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during login"
         )
+
+@router.post("/logout")
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    try:
+        payload = verify_token(credentials.credentials)
+        if not payload:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        orchestrator.stop_instance(str(user_id))
+        return {"detail": "Logged out"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during logout: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(

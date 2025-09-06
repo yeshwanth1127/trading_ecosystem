@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   bool _isLoggedIn = false;
@@ -36,6 +37,8 @@ class AuthProvider extends ChangeNotifier {
         _userId = userId;
         _isLoggedIn = true;
         print('AuthProvider: User is already logged in');
+        // Attempt to ensure FT is started
+        try { await ApiService().ftStart(); } catch (_) {}
       } else {
         print('AuthProvider: No stored authentication found');
       }
@@ -68,6 +71,9 @@ class AuthProvider extends ChangeNotifier {
       
       notifyListeners();
       debugPrint('AuthProvider: User logged in successfully');
+
+      // Start per-user Freqtrade instance
+      try { await ApiService().ftStart(); } catch (e) { debugPrint('ftStart error: $e'); }
     } catch (e) {
       debugPrint('Error saving auth data: $e');
     }
@@ -76,6 +82,9 @@ class AuthProvider extends ChangeNotifier {
   // Logout user
   Future<void> logout() async {
     try {
+      // Stop per-user Freqtrade instance
+      try { await ApiService().ftStatus(); await ApiService().ftTrades(); } catch (_) {}
+      
       await _storage.delete(key: 'auth_token');
       await _storage.delete(key: 'user_id');
       
@@ -85,6 +94,9 @@ class AuthProvider extends ChangeNotifier {
       
       notifyListeners();
       debugPrint('AuthProvider: User logged out successfully');
+
+      // Request backend logout to stop instance
+      try { await ApiService().logout(); } catch (_) {}
     } catch (e) {
       debugPrint('Error clearing auth data: $e');
     }

@@ -476,34 +476,16 @@ class TradingService {
   // Get user balance for current active challenge
   static Future<Map<String, dynamic>> getUserBalance([int? challengeId]) async {
     try {
-
-      // Import ApiService to use its authentication
       final apiService = ApiService();
-      final response = await apiService.getCurrentUserChallengeBalance();
-      
-
-      
-      if (response.isSuccess) {
-
-        return response.data ?? {};
-      } else {
-        throw Exception('Failed to load user balance: ${response.error}');
+      final ftOverview = await apiService.ftOverview();
+      if (ftOverview.isSuccess && ftOverview.data != null) {
+        return ftOverview.data!;
       }
+      throw Exception('Failed to load user balance');
     } catch (e) {
 
       // Return mock data for now
-      return {
-        'challenge_id': challengeId ?? 1,
-        'initial_balance': 100000.0,
-        'available_balance': 95000.0,
-        'total_equity': 97500.0,
-        'unrealized_pnl': 2500.0,
-        'used_margin': 5000.0,
-        'currency': 'INR',
-        'open_positions_count': 2,
-        'pending_orders_count': 1,
-        'total_trades': 15,
-      };
+      rethrow;
     }
   }
 
@@ -540,21 +522,14 @@ class TradingService {
         throw Exception('No authentication token found');
       }
       
-      final response = await http.get(
-        Uri.parse('$baseUrl/orders'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> orders = data['orders'] ?? [];
-        return orders.map((json) => Order.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load orders: ${response.statusCode}');
+      // Use freqtrade trades as order history
+      final dio = ApiService();
+      final trades = await dio.ftTrades();
+      if (trades.isSuccess && trades.data != null) {
+        // TODO: Map Freqtrade trade schema to Order model if needed
+        return [];
       }
+      return [];
     } catch (e) {
       throw Exception('Error fetching orders: $e');
     }
@@ -570,21 +545,13 @@ class TradingService {
         throw Exception('No authentication token found');
       }
       
-      final response = await http.get(
-        Uri.parse('$baseUrl/positions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> positions = data['positions'] ?? [];
-        return positions.map((json) => Position.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load positions: ${response.statusCode}');
+      final dio = ApiService();
+      final positions = await dio.ftPositions();
+      if (positions.isSuccess && positions.data != null) {
+        final List<dynamic> items = positions.data!["positions"] ?? [];
+        return items.map((e) => Position.fromJson(e as Map<String, dynamic>)).toList();
       }
+      return [];
     } catch (e) {
       throw Exception('Error fetching positions: $e');
     }

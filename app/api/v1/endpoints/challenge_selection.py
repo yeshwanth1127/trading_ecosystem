@@ -6,6 +6,8 @@ from app.crud import challenge_selection, user
 from app.schemas import ChallengeSelectionCreate, ChallengeSelectionResponse, ChallengeSelectionListResponse
 from app.core.security import verify_token
 import logging
+from app.orchestrator import orchestrator
+from app.services.trading_challenge_service import TradingChallengeService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,6 +51,13 @@ async def create_challenge_selection(
         )
         
         logger.info(f"Challenge selection created for user {user_id}: {db_selection.selection_id}")
+
+        # Prepare per-user user_data and provision config with starting balance
+        orchestrator.ensure_user_userdir(user_id)
+        initial_balance = TradingChallengeService.parse_amount(db_selection.amount)
+        if initial_balance <= 0:
+            initial_balance = 1000.0
+        orchestrator.provision_user_config(user_id, dry_run_wallet=initial_balance)
         return db_selection
         
     except HTTPException:

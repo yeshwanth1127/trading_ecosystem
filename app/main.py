@@ -14,6 +14,7 @@ from app.services.execution_engine import execution_engine
 from app.services.account_balance_service import account_balance_service
 from app.services.transaction_manager import transaction_manager
 from app.api.v1.trading_events import event_manager
+from app.orchestrator import orchestrator
 
 # Configure logging
 logging.basicConfig(
@@ -53,26 +54,9 @@ async def lifespan(app: FastAPI):
         await instrument_service.initialize()
         logger.info("Instrument service initialized successfully")
         
-        # Initialize real-time market data service
-        await real_time_market_data_service.initialize()
-        logger.info("Real-time market data service initialized successfully")
-        
-        # Start market data feed in background
-        import asyncio
-        asyncio.create_task(real_time_market_data_service.start_market_data_feed(interval_seconds=5))
-        logger.info("Real-time market data feed started")
-        
-        # Initialize execution engine
-        await execution_engine.initialize()
-        logger.info("Execution engine initialized successfully")
-        
-        # Initialize account balance service
-        await account_balance_service.initialize()
-        logger.info("Account balance service initialized successfully")
-        
-        # Start account balance service in background
-        asyncio.create_task(account_balance_service.start())
-        logger.info("Account balance service started")
+        # Disable legacy internal trading subsystems when using Freqtrade orchestration
+        # Start orchestrator idle monitor
+        orchestrator.start_idle_monitor()
         
         # Initialize trading event manager
         await event_manager.initialize()
@@ -87,17 +71,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down Trading Ecosystem API...")
     try:
-        # Close real-time market data service
-        await real_time_market_data_service.close()
-        logger.info("Real-time market data service closed successfully")
-        
-        # Close execution engine
-        await execution_engine.close()
-        logger.info("Execution engine closed successfully")
-        
-        # Close account balance service
-        await account_balance_service.close()
-        logger.info("Account balance service closed successfully")
+        # Nothing to close for orchestrator beyond FastAPI shutdown
         
         # Close trading event manager
         await event_manager.stop()

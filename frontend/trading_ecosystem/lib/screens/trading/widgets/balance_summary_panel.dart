@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/trading_provider.dart';
+import '../../../services/api_service.dart';
 
 class BalanceSummaryPanel extends StatelessWidget {
   const BalanceSummaryPanel({super.key});
@@ -24,6 +25,8 @@ class BalanceSummaryPanel extends StatelessWidget {
             child: Consumer<TradingProvider>(
               builder: (context, tradingProvider, child) {
                 final summary = tradingProvider.dashboardSummary ?? {};
+                // Trigger overview refresh silently when panel builds
+                _refreshOverview(context, tradingProvider);
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -40,6 +43,17 @@ class BalanceSummaryPanel extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _refreshOverview(BuildContext context, TradingProvider provider) async {
+    try {
+      final api = ApiService();
+      final res = await api.ftOverview();
+      if (res.isSuccess && res.data != null) {
+        // Update provider dashboard summary by reusing existing flow
+        provider.loadUserBalance();
+      }
+    } catch (_) {}
   }
 
   Widget _buildHeader() {
