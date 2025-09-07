@@ -109,7 +109,7 @@ class FreqtradeOrchestrator:
         """Ensure template dir exists with a minimal dry-run config and no strategy files."""
         self._template_dir.mkdir(parents=True, exist_ok=True)
         config = {
-            "max_open_trades": 3,
+            "max_open_trades": 10,
             "stake_currency": "USDT",
             "stake_amount": "unlimited",
             "dry_run": True,
@@ -171,16 +171,14 @@ class FreqtradeOrchestrator:
             config = {}
 
         # Minimal required fields
-        config.setdefault("max_open_trades", 3)
+        config.setdefault("max_open_trades", 10)
         config.setdefault("stake_currency", "USDT")
-        config.setdefault("stake_amount", "unlimited")
+        # Use full available wallet by default (unlimited = no fixed order size cap)
+        config["stake_amount"] = "unlimited"
         config["dry_run"] = True
         config["dry_run_wallet"] = float(dry_run_wallet)
         config.setdefault("force_entry_enable", True)
         config.setdefault("timeframe", "5m")
-        # Ensure strategy path exists in user_data
-        strategies_dir = self._user_dir(user_id) if user_id else self._template_dir
-        (strategies_dir / "strategies").mkdir(parents=True, exist_ok=True)
 
         api_server = config.get("api_server", {})
         api_server.update(
@@ -209,6 +207,25 @@ class FreqtradeOrchestrator:
         exchange.setdefault("pair_blacklist", [])
         config["exchange"] = exchange
 
+        cfg_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    def update_user_pair_whitelist(self, user_id: str, pairs: list[str]) -> None:
+        """Overwrite user's exchange.pair_whitelist with provided list of pairs."""
+        cfg_path = self._config_path(user_id)
+        config: Dict[str, Any]
+        if cfg_path.exists():
+            try:
+                config = json.loads(cfg_path.read_text(encoding="utf-8"))
+            except Exception:
+                config = {}
+        else:
+            config = {}
+
+        exchange = config.get("exchange", {})
+        exchange.setdefault("name", "binance")
+        exchange["pair_whitelist"] = pairs
+        exchange.setdefault("pair_blacklist", [])
+        config["exchange"] = exchange
         cfg_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
     def provision_user_config(self, user_id: str, dry_run_wallet: float) -> None:
@@ -299,8 +316,6 @@ class FreqtradeOrchestrator:
             "trade",
             "--config",
             config_path,
-            "--strategy",
-            "SampleStrategy",
             "--dry-run",
             "--api-server",
             "--api-server-port",
@@ -429,8 +444,10 @@ class FreqtradeOrchestrator:
         url = f"http://127.0.0.1:{record.port}/api/v1{path}"
         record.last_active_at = time.time()
         self._save_registry()
-        async with aiohttp.ClientSession(auth=auth) as session:
-            async with session.request(method.upper(), url, json=json_payload, timeout=timeout) as resp:
+        session: Optional[aiohttp.ClientSession] = None
+        try:
+            session = aiohttp.ClientSession(auth=auth, timeout=aiohttp.ClientTimeout(total=timeout))
+            async with session.request(method.upper(), url, json=json_payload) as resp:
                 status = resp.status
                 try:
                     data = await resp.json()
@@ -438,6 +455,14 @@ class FreqtradeOrchestrator:
                     text = await resp.text()
                     data = {"detail": text}
                 return status, data
+        except asyncio.CancelledError:
+            # Ensure proper cleanup on cancellation
+            if session and not session.closed:
+                await session.close()
+            raise
+        finally:
+            if session and not session.closed:
+                await session.close()
 
 
 # Global orchestrator singleton

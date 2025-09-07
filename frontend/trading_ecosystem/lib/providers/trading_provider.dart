@@ -12,6 +12,7 @@ class TradingProvider with ChangeNotifier {
   List<Instrument> _instruments = [];
   List<Instrument> _marketData = [];
   List<Order> _userOrders = [];
+  List<Order> _tradeHistory = [];
   List<Position> _userPositions = [];
   Map<String, dynamic>? _dashboardSummary;
   bool _isLoading = false;
@@ -49,6 +50,7 @@ class TradingProvider with ChangeNotifier {
   List<Instrument> get instruments => _instruments;
   List<Instrument> get marketData => _marketData;
   List<Order> get userOrders => _userOrders;
+  List<Order> get tradeHistory => _tradeHistory;
   List<Position> get userPositions => _userPositions;
   Map<String, dynamic>? get dashboardSummary => _dashboardSummary;
   bool get isLoading => _isLoading;
@@ -92,9 +94,8 @@ class TradingProvider with ChangeNotifier {
   }
 
   List<Order> getPendingOrders() {
-    return _userOrders.where((order) => 
-      order.status == OrderStatus.PENDING
-    ).toList();
+    // Without status, consider pending = not fully filled yet
+    return _userOrders.where((order) => order.filledQuantity <= 0).toList();
   }
 
   String get currency => _accountBalance?['currency'] ?? 'INR';
@@ -243,8 +244,9 @@ class TradingProvider with ChangeNotifier {
     try {
       print('TradingProvider: Loading user orders...');
       final orders = await TradingService.getUserOrdersData();
-      _userOrders = orders;
-      print('TradingProvider: Loaded ${orders.length} orders');
+      _userOrders = orders.where((o) => o.filledQuantity <= 0).toList();
+      _tradeHistory = orders.where((o) => o.filledQuantity > 0).toList();
+      print('TradingProvider: Loaded ${orders.length} orders (open: ${_userOrders.length}, closed: ${_tradeHistory.length})');
     } catch (e) {
       print('TradingProvider: Error loading orders: $e');
       _setError('Failed to load user orders: $e');
@@ -352,7 +354,7 @@ class TradingProvider with ChangeNotifier {
     notifyListeners();
     debugPrint('🔌 WebSocket disconnected in TradingProvider');
   }
-  
+
   void _setupWebSocketListeners() {
     // Listen to market data updates
     _marketDataSubscription = _webSocketService.marketDataStream.listen(
@@ -384,7 +386,7 @@ class TradingProvider with ChangeNotifier {
       onError: (error) => debugPrint('Trade data stream error: $error'),
     );
   }
-  
+
   void _cleanupWebSocketListeners() {
     _marketDataSubscription?.cancel();
     _orderDataSubscription?.cancel();
@@ -398,7 +400,7 @@ class TradingProvider with ChangeNotifier {
     _balanceDataSubscription = null;
     _tradeDataSubscription = null;
   }
-  
+
   void _handleMarketDataUpdate(Map<String, dynamic> data) {
     final String type = data['type'] ?? '';
     
@@ -420,7 +422,7 @@ class TradingProvider with ChangeNotifier {
         break;
     }
   }
-  
+
   void _handleOrderUpdate(Map<String, dynamic> data) {
     final String type = data['type'] ?? '';
     final orderData = data['order'] as Map<String, dynamic>?;
@@ -448,7 +450,7 @@ class TradingProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   void _handlePositionUpdate(Map<String, dynamic> data) {
     final String type = data['type'] ?? '';
     final positionData = data['position'] as Map<String, dynamic>?;
@@ -478,7 +480,7 @@ class TradingProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   void _handleBalanceUpdate(Map<String, dynamic> data) {
     final String type = data['type'] ?? '';
     
@@ -497,13 +499,13 @@ class TradingProvider with ChangeNotifier {
         break;
     }
   }
-  
+
   void _handleTradeUpdate(Map<String, dynamic> data) {
     // Handle trade execution updates
     debugPrint('Trade executed: ${data['trade']}');
     notifyListeners();
   }
-  
+
   void _updateLivePrices(Map<String, dynamic> marketPrices) {
     marketPrices.forEach((symbol, priceData) {
       if (priceData is Map<String, dynamic>) {
@@ -515,7 +517,7 @@ class TradingProvider with ChangeNotifier {
     });
     notifyListeners();
   }
-  
+
   void _updateAccountBalance(Map<String, dynamic> balanceData) {
     _accountBalance = balanceData;
     _totalEquity = (balanceData['equity'] as num?)?.toDouble() ?? 0.0;
@@ -523,7 +525,7 @@ class TradingProvider with ChangeNotifier {
     _realizedPnl = (balanceData['realized_pnl'] as num?)?.toDouble() ?? 0.0;
     // Don't call notifyListeners() here - let the caller decide when to notify
   }
-  
+
   /// Calculate total unrealized P&L from all open positions
   /// This just sums up the P&L values calculated by the backend
   double _calculateTotalUnrealizedPnl() {
@@ -539,7 +541,7 @@ class TradingProvider with ChangeNotifier {
     }
     return totalPnl;
   }
-  
+
   /// Update total equity based on available balance + unrealized P&L
   void _updateTotalEquity() {
     final availableBalance = _accountBalance?['available_balance'] ?? 
@@ -577,7 +579,7 @@ class TradingProvider with ChangeNotifier {
       }
     });
   }
-  
+
   /// Refresh position data to get updated P&L values
   Future<void> _refreshPositionData() async {
     try {
@@ -589,7 +591,7 @@ class TradingProvider with ChangeNotifier {
       debugPrint('Error refreshing position data: $e');
     }
   }
-  
+
   /// Background refresh position data (no loading state, no UI glitch, no console spam)
   Future<void> _refreshPositionDataBackground() async {
     try {
@@ -607,21 +609,6 @@ class TradingProvider with ChangeNotifier {
     }
   }
 
-  /// Refresh balance and positions via Freqtrade proxy
-  Future<void> refreshFromFreqtrade() async {
-    try {
-      final api = ApiService();
-      final status = await api.ftStatus();
-      if (!(status.isSuccess && (status.data?['running'] == true))) {
-        await api.ftStart();
-      }
-      await _loadUserBalanceBackground();
-      await _refreshPositionDataBackground();
-    } catch (e) {
-      debugPrint('refreshFromFreqtrade error: $e');
-    }
-  }
-  
   /// Background load user balance (no loading state, no UI glitch, no console spam)
   Future<void> _loadUserBalanceBackground() async {
     try {
@@ -634,7 +621,7 @@ class TradingProvider with ChangeNotifier {
       // Silent error handling - no console spam
     }
   }
-  
+
   /// Manually trigger position price updates
   Future<void> refreshPositionPrices() async {
     try {

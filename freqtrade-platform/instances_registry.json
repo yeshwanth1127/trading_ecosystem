@@ -1,0 +1,12 @@
+{
+  "2bcb66fe-9a4c-40b4-9057-daf6c7580e3b": {
+    "user_id": "2bcb66fe-9a4c-40b4-9057-daf6c7580e3b",
+    "port": 18880,
+    "username": "2bcb66fe-9a4c-40b4-9057-daf6c7580e3b",
+    "password": "RmmP-CCky4YDHicWGYJU4jIF",
+    "jwt_secret_key": "rcH6a5imUh_dkNY29y6I6pI5FO6HqpoS",
+    "started_at": 1757177108.671321,
+    "last_active_at": 1757177127.4080265,
+    "pid": 17768
+  }
+}

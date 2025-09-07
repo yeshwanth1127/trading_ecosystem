@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:io' as io;
 import '../models/api_response.dart';
 import '../models/user.dart';
 import '../models/account.dart';
@@ -10,7 +12,24 @@ import '../models/subscription_plan.dart';
 import '../models/subscription.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8000/api/v1';
+  static String _resolveBaseUrl() {
+    // Web: point to backend port explicitly (frontend origin is not the API)
+    if (kIsWeb) {
+      return 'http://127.0.0.1:8000/api/v1';
+    }
+    // Mobile/Desktop: detect platform; Android emulators need 10.0.2.2
+    try {
+      if (io.Platform.isAndroid) {
+        return 'http://10.0.2.2:8000/api/v1';
+      }
+    } catch (_) {
+      // Platform may not be available (e.g., tests); fall through
+    }
+    // Default to localhost for iOS simulator/desktop
+    return 'http://localhost:8000/api/v1';
+  }
+
+  static final String baseUrl = _resolveBaseUrl();
   static const String _tokenKey = 'auth_token';
   
   late final Dio _dio;
@@ -391,6 +410,30 @@ class ApiService {
         return ApiResponse.success(Map<String, dynamic>.from(response.data));
       }
       return ApiResponse.error('Failed to get overview');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftProfit() async {
+    try {
+      final response = await _dio.get('/ft/profit');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(Map<String, dynamic>.from(response.data));
+      }
+      return ApiResponse.error('Failed to get profit');
+    } catch (e) {
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> ftProfitAll() async {
+    try {
+      final response = await _dio.get('/ft/profit_all');
+      if (response.statusCode == 200) {
+        return ApiResponse.success(Map<String, dynamic>.from(response.data));
+      }
+      return ApiResponse.error('Failed to get profit summary');
     } catch (e) {
       return ApiResponse.error('Network error: $e');
     }

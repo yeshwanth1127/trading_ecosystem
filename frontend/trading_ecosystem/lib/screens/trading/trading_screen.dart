@@ -8,6 +8,7 @@ import 'widgets/positions_panel.dart';
 import 'widgets/order_panel.dart';
 import 'widgets/balance_panel.dart';
 import 'widgets/balance_summary_panel.dart';
+import 'widgets/trades_panel.dart';
 
 class TradingScreen extends StatefulWidget {
   const TradingScreen({Key? key}) : super(key: key);
@@ -250,6 +251,18 @@ class _TradingScreenState extends State<TradingScreen> {
                 
                 const SizedBox(height: 8),
                 
+                // Trade History
+                Consumer<TradingProvider>(
+                  builder: (context, tradingProvider, child) {
+                    return TradesPanel(
+                      title: 'Recent Trades',
+                      orders: tradingProvider.tradeHistory,
+                    );
+                  },
+                ),
+                
+                const SizedBox(height: 8),
+                
                 // Closed Positions
                 Consumer<TradingProvider>(
                   builder: (context, tradingProvider, child) {
@@ -390,6 +403,18 @@ class _TradingScreenState extends State<TradingScreen> {
                           return OrderPanel(
                             title: 'Pending Orders',
                             orders: tradingProvider.getPendingOrders(),
+                          );
+                        },
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Trade History
+                      Consumer<TradingProvider>(
+                        builder: (context, tradingProvider, child) {
+                          return TradesPanel(
+                            title: 'Recent Trades',
+                            orders: tradingProvider.tradeHistory,
                           );
                         },
                       ),

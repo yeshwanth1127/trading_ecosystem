@@ -4,7 +4,6 @@ class Order {
   final String instrumentId;
   final OrderType orderType;
   final OrderSide side;
-  final OrderStatus status;
   final double quantity;
   final double filledQuantity;
   final double? price;
@@ -23,7 +22,6 @@ class Order {
     required this.instrumentId,
     required this.orderType,
     required this.side,
-    required this.status,
     required this.quantity,
     required this.filledQuantity,
     this.price,
@@ -50,10 +48,6 @@ class Order {
         (e) => e.value == json['side'],
         orElse: () => OrderSide.BUY,
       ),
-      status: OrderStatus.values.firstWhere(
-        (e) => e.value == json['status'],
-        orElse: () => OrderStatus.PENDING,
-      ),
       quantity: (json['quantity'] as num).toDouble(),
       filledQuantity: (json['filled_quantity'] as num).toDouble(),
       price: json['price'] != null ? (json['price'] as num).toDouble() : null,
@@ -75,7 +69,6 @@ class Order {
       'instrument_id': instrumentId,
       'order_type': orderType.value,
       'side': side.value,
-      'status': status.value,
       'quantity': quantity,
       'filled_quantity': filledQuantity,
       'price': price,
@@ -92,7 +85,7 @@ class Order {
 
   @override
   String toString() {
-    return 'Order(${side.value} ${quantity} ${orderType.value} - ${status.value})';
+    return 'Order(${side.value} ${quantity} ${orderType.value})';
   }
 }
 
@@ -114,13 +107,4 @@ enum OrderSide {
   final String value;
 }
 
-enum OrderStatus {
-  PENDING('pending'),
-  PARTIAL('partial'),
-  FILLED('filled'),
-  CANCELLED('cancelled'),
-  REJECTED('rejected');
-
-  const OrderStatus(this.value);
-  final String value;
-}
+// Status removed per requirement.

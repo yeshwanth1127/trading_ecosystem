@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict
+import importlib
+import asyncio
 
 from app.api.deps import get_db
 from app.core.security import verify_token
@@ -12,6 +14,7 @@ from app.orchestrator import orchestrator
 router = APIRouter()
 security = HTTPBearer()
 _rate_limits: dict[str, list[float]] = {}
+_user_locks: dict[str, asyncio.Lock] = {}
 
 
 def _rate_limiter(user_id: str, max_calls: int = 10, per_seconds: int = 60) -> None:
@@ -53,15 +56,18 @@ async def start_instance(
 ):
     user_id = await _get_user_id(credentials)
     _rate_limiter(user_id, max_calls=5, per_seconds=60)
-    # Determine initial balance from active challenge selection
-    active = await challenge_selection.get_active_by_user_id(db, user_id=user_id)
-    if not active:
-        raise HTTPException(status_code=400, detail="No active challenge selection")
-    initial_balance = TradingChallengeService.parse_amount(active.amount)
-    if initial_balance <= 0:
-        initial_balance = 1000.0
-    rec = orchestrator.start_instance(user_id, dry_run_wallet=initial_balance)
-    return {"started": True}
+    lock = _user_locks.setdefault(user_id, asyncio.Lock())
+    async with lock:
+        # Determine initial balance from active challenge selection, or fallback to existing config
+        active = await challenge_selection.get_active_by_user_id(db, user_id=user_id)
+        if active:
+            initial_balance = TradingChallengeService.parse_amount(active.amount)
+            if initial_balance <= 0:
+                initial_balance = orchestrator._read_user_dry_run_wallet(user_id)
+        else:
+            initial_balance = orchestrator._read_user_dry_run_wallet(user_id)
+        orchestrator.start_instance(user_id, dry_run_wallet=initial_balance)
+        return {"started": True}
 
 
 @router.post("/stop")
@@ -70,8 +76,10 @@ async def stop_instance(
 ):
     user_id = await _get_user_id(credentials)
     _rate_limiter(user_id, max_calls=5, per_seconds=60)
-    stopped = orchestrator.stop_instance(user_id)
-    return {"stopped": stopped}
+    lock = _user_locks.setdefault(user_id, asyncio.Lock())
+    async with lock:
+        stopped = orchestrator.stop_instance(user_id)
+        return {"stopped": stopped}
 
 
 @router.get("/balance")
@@ -138,7 +146,33 @@ async def trades(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     status_code, data = await orchestrator._request(user_id, "GET", "/trades")
     if status_code >= 400:
         raise HTTPException(status_code=status_code, detail=data)
-    return {"trades": data}
+    # Map to a simplified order/trade model for frontend
+    mapped: list[Dict[str, Any]] = []
+    for t in data or []:
+        side = "buy" if (t.get("profit_abs", 0) is not None) else "buy"
+        qty = float(t.get("amount", 0) or 0)
+        entry = float(t.get("open_rate", 0) or 0)
+        exit_r = float(t.get("close_rate", 0) or 0) if t.get("close_rate") is not None else None
+        total_amt = qty * (entry if entry else 0)
+        mapped.append({
+            "order_id": str(t.get("trade_id")),
+            "user_id": user_id,
+            "instrument_id": t.get("pair"),
+            "order_type": "market",
+            "side": side,
+            "quantity": qty,
+            "filled_quantity": qty if (t.get("is_open") is False) else 0.0,
+            "price": entry,
+            "stop_price": None,
+            "total_amount": total_amt,
+            "commission": float(t.get("fee_abs", 0) or 0),
+            "notes": (f"exit:{exit_r}" if exit_r is not None else None),
+            "created_at": t.get("open_date"),
+            "updated_at": t.get("close_date") or t.get("open_date"),
+            "filled_at": t.get("close_date"),
+            "cancelled_at": None,
+        })
+    return {"trades": mapped}
 
 
 @router.get("/positions")
@@ -179,28 +213,29 @@ async def forcebuy(
 ):
     user_id = await _get_user_id(credentials)
     _rate_limiter(user_id)
+    lock = _user_locks.setdefault(user_id, asyncio.Lock())
+    async with lock:
     # Validate payload (symbol, price, amount)
-    pair = payload.get("pair")
-    if not pair or not isinstance(pair, str):
-        raise HTTPException(status_code=400, detail="pair is required")
-    # Whitelist enforcement
-    # Load pair whitelist from user's config
-    try:
-        cfg_path = orchestrator._config_path(user_id)
-        import json as _json
-        cfg = _json.loads(cfg_path.read_text(encoding="utf-8"))
-        allowed = set((cfg.get("exchange", {}).get("pair_whitelist", [])))
-        if allowed and pair not in allowed:
-            raise HTTPException(status_code=400, detail="Pair not whitelisted")
-    except HTTPException:
-        raise
-    except Exception:
-        pass
-    amount = payload.get("amount")
-    status_code, data = await orchestrator._request(user_id, "POST", "/forcebuy", json_payload={"pair": pair, "amount": amount})
-    if status_code >= 400:
-        raise HTTPException(status_code=status_code, detail=data)
-    return data
+        pair = payload.get("pair")
+        if not pair or not isinstance(pair, str):
+            raise HTTPException(status_code=400, detail="pair is required")
+        # Whitelist enforcement
+        try:
+            cfg_path = orchestrator._config_path(user_id)
+            import json as _json
+            cfg = _json.loads(cfg_path.read_text(encoding="utf-8"))
+            allowed = set((cfg.get("exchange", {}).get("pair_whitelist", [])))
+            if allowed and pair not in allowed:
+                raise HTTPException(status_code=400, detail="Pair not whitelisted")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+        amount = payload.get("amount")
+        status_code, data = await orchestrator._request(user_id, "POST", "/forcebuy", json_payload={"pair": pair, "amount": amount})
+        if status_code >= 400:
+            raise HTTPException(status_code=status_code, detail=data)
+        return data
 
 
 @router.post("/forcesell")
@@ -210,12 +245,72 @@ async def forcesell(
 ):
     user_id = await _get_user_id(credentials)
     _rate_limiter(user_id)
-    trade_id = payload.get("tradeid") or payload.get("trade_id")
-    if not trade_id:
-        raise HTTPException(status_code=400, detail="tradeid is required")
-    status_code, data = await orchestrator._request(user_id, "POST", "/forcesell", json_payload={"tradeid": trade_id})
+    lock = _user_locks.setdefault(user_id, asyncio.Lock())
+    async with lock:
+        trade_id = payload.get("tradeid") or payload.get("trade_id")
+        if not trade_id:
+            raise HTTPException(status_code=400, detail="tradeid is required")
+        status_code, data = await orchestrator._request(user_id, "POST", "/forcesell", json_payload={"tradeid": trade_id})
+        if status_code >= 400:
+            raise HTTPException(status_code=status_code, detail=data)
+        return data
+
+
+@router.get("/profit")
+async def profit(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    user_id = await _get_user_id(credentials)
+    status_code, data = await orchestrator._request(user_id, "GET", "/profit")
     if status_code >= 400:
         raise HTTPException(status_code=status_code, detail=data)
-    return data
+    return {"profit": data}
 
+
+@router.get("/profit_all")
+async def profit_all(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    user_id = await _get_user_id(credentials)
+    status_code, data = await orchestrator._request(user_id, "GET", "/profit_all")
+    if status_code >= 400:
+        raise HTTPException(status_code=status_code, detail=data)
+    return {"profit_all": data}
+
+@router.post("/sync-whitelist")
+async def sync_whitelist(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Fetch all Binance USDT futures pairs and write them to the user's whitelist."""
+    user_id = await _get_user_id(credentials)
+    _rate_limiter(user_id, max_calls=2, per_seconds=60)
+    lock = _user_locks.setdefault(user_id, asyncio.Lock())
+    async with lock:
+        # Ensure ccxt is available
+        try:
+            ccxt = importlib.import_module("ccxt")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"ccxt not available: {e}")
+        try:
+            ex = ccxt.binance({"options": {"defaultType": "future"}})
+            markets = ex.load_markets()
+            usdt_pairs: list[str] = []
+            for symbol, m in markets.items():
+                try:
+                    if (
+                        isinstance(symbol, str)
+                        and symbol.endswith("/USDT")
+                        and m.get("contract") is True
+                        and (m.get("linear") is True or m.get("settle") == "USDT")
+                        and m.get("type") in ("future", "swap")
+                        and m.get("active", True)
+                    ):
+                        usdt_pairs.append(symbol)
+                except Exception:
+                    continue
+            usdt_pairs = sorted(list(set(usdt_pairs)))
+            if not usdt_pairs:
+                raise HTTPException(status_code=502, detail="No USDT pairs found from Binance")
+            orchestrator.update_user_pair_whitelist(user_id, usdt_pairs)
+            return {"updated": True, "count": len(usdt_pairs)}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Whitelist sync failed: {e}")
 

@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # Regex to allow all localhost ports by default
     cors_origin_regex_raw: str = os.getenv(
         "CORS_ORIGIN_REGEX",
-        r"^https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?$",
+        r"^https?://(localhost|127\.0\.0\.1)(:\\d+)?$",
     )
     
     @property
@@ -79,13 +79,8 @@ class Settings(BaseSettings):
         if self.environment == "production":
             if self.secret_key == "your-secret-key-here-make-it-long-and-random":
                 errors.append("SECRET_KEY must be set to a secure value in production")
-            
-            if "localhost" in self.database_url:
-                errors.append("Database URL should not use localhost in production")
-        
-        # Check for required API keys
-        if not self.binance_api_key and self.environment == "production":
-            errors.append("BINANCE_API_KEY is required for production")
+            if any(x in (self.database_url or "") for x in ["postgres:postgres@localhost", "@localhost:"]):
+                errors.append("DATABASE_URL should be set securely and not use default credentials or localhost in production")
         
         if errors:
             error_msg = "Configuration validation failed:\n" + "\n".join(f"- {error}" for error in errors)

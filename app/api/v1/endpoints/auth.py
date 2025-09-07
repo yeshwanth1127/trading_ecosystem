@@ -36,6 +36,42 @@ async def register(
         # Create per-user user_data directory from template
         orchestrator.ensure_user_userdir(str(db_user.user_id))
 
+        # Initialize whitelist with Binance USDT futures pairs on first account creation
+        try:
+            from app.api.v1.endpoints.freqtrade_proxy import sync_whitelist  # type: ignore
+            # Simulate a call by directly invoking whitelist builder logic
+            import importlib
+            ccxt = importlib.import_module("ccxt")
+            ex = ccxt.binance({"options": {"defaultType": "future"}})
+            markets = ex.load_markets()
+            usdt_pairs = []
+            for symbol, m in markets.items():
+                try:
+                    # Futures: contract markets, USDT margined, active
+                    if (
+                        isinstance(symbol, str)
+                        and symbol.endswith("/USDT")
+                        and m.get("contract") is True
+                        and (m.get("linear") is True or m.get("settle") == "USDT")
+                        and m.get("type") in ("future", "swap")
+                        and m.get("active", True)
+                    ):
+                        usdt_pairs.append(symbol)
+                except Exception:
+                    continue
+            if usdt_pairs:
+                orchestrator.update_user_pair_whitelist(str(db_user.user_id), sorted(list(set(usdt_pairs))))
+        except Exception as e:
+            logger.warning(f"Whitelist prefill failed: {e}")
+
+        # Immediately start a Freqtrade instance for this user (will be re-provisioned by challenge later)
+        try:
+            initial_wallet = orchestrator._read_user_dry_run_wallet(str(db_user.user_id))
+            orchestrator.start_instance(str(db_user.user_id), dry_run_wallet=initial_wallet)
+            logger.info(f"Started Freqtrade instance for user {db_user.user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to start Freqtrade for new user {db_user.user_id}: {e}")
+
         return db_user
         
     except HTTPException:

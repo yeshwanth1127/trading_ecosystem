@@ -58,6 +58,14 @@ async def create_challenge_selection(
         if initial_balance <= 0:
             initial_balance = 1000.0
         orchestrator.provision_user_config(user_id, dry_run_wallet=initial_balance)
+
+        # Start the user's Freqtrade instance immediately using this challenge amount
+        try:
+            orchestrator.start_instance(user_id, dry_run_wallet=initial_balance)
+            logger.info(f"Started Freqtrade for user {user_id} with wallet {initial_balance}")
+        except Exception as e:
+            logger.error(f"Failed to start Freqtrade for user {user_id}: {e}")
+
         return db_selection
         
     except HTTPException:

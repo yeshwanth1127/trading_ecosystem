@@ -207,9 +207,9 @@ class OrderPanel extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Status: ${order.status.value.toUpperCase()}',
+                  order.filledQuantity > 0 ? 'FILLED' : 'PENDING',
                   style: TextStyle(
-                    color: _getStatusColor(order.status),
+                    color: order.filledQuantity > 0 ? Colors.green : Colors.orange,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -230,9 +230,7 @@ class OrderPanel extends StatelessWidget {
               ),
             ],
             // Action buttons for active orders
-            if (order.status != OrderStatus.FILLED && 
-                order.status != OrderStatus.CANCELLED && 
-                order.status != OrderStatus.REJECTED) ...[
+            if (order.filledQuantity <= 0) ...[
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -266,21 +264,4 @@ class OrderPanel extends StatelessWidget {
       ),
     );
   }
-
-  Color _getStatusColor(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.PENDING:
-        return Colors.orange;
-      case OrderStatus.PARTIAL:
-        return Colors.blue;
-      case OrderStatus.FILLED:
-        return Colors.green;
-      case OrderStatus.CANCELLED:
-        return Colors.red;
-      case OrderStatus.REJECTED:
-        return Colors.red;
-    }
-  }
-
-
 }

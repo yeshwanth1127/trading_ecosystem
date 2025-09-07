@@ -1,0 +1,35 @@
+{
+  "max_open_trades": 10,
+  "stake_currency": "USDT",
+  "stake_amount": "unlimited",
+  "dry_run": true,
+  "dry_run_wallet": 1000.0,
+  "force_entry_enable": true,
+  "timeframe": "5m",
+  "api_server": {
+    "enabled": true,
+    "listen_ip": "127.0.0.1",
+    "port": 18880,
+    "username": "2bcb66fe-9a4c-40b4-9057-daf6c7580e3b",
+    "password": "RmmP-CCky4YDHicWGYJU4jIF",
+    "jwt_secret_key": "rcH6a5imUh_dkNY29y6I6pI5FO6HqpoS",
+    "enable_openapi": false
+  },
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "BTC/USDT",
+      "ETH/USDT"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ]
+}

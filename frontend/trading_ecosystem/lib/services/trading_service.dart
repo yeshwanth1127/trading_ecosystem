@@ -7,7 +7,16 @@ import '../services/api_service.dart'; // Added import for ApiService
 
 class TradingService {
   // Base URLs for different APIs
-  static const String baseUrl = 'http://localhost:8000/api/v1/trading';
+  static String _resolveTradingBase() {
+    // Use same resolver as ApiService
+    try {
+      // ignore: avoid_web_libraries_in_flutter
+      // We'll conditionally import if needed; fallback logic here
+    } catch (_) {}
+    return ApiService.baseUrl.replaceAll('/api/v1', '/api/v1/trading');
+  }
+
+  static final String baseUrl = _resolveTradingBase();
   static const String binanceApiUrl = 'https://api.binance.com/api/v3';
   static const String coinGeckoApiUrl = 'https://api.coingecko.com/api/v3';
   static const String alphaVantageApiUrl = 'https://www.alphavantage.co/query';
@@ -526,8 +535,8 @@ class TradingService {
       final dio = ApiService();
       final trades = await dio.ftTrades();
       if (trades.isSuccess && trades.data != null) {
-        // TODO: Map Freqtrade trade schema to Order model if needed
-        return [];
+        final List<dynamic> items = trades.data!["trades"] ?? [];
+        return items.map((json) => Order.fromJson(Map<String, dynamic>.from(json))).toList();
       }
       return [];
     } catch (e) {
